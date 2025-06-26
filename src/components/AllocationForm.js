@@ -1,19 +1,56 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { CalendarIcon, FolderIcon, MagnifyingGlassIcon, ClockIcon } from '@heroicons/react/24/outline'
+import { CalendarIcon, FolderIcon, MagnifyingGlassIcon, ClockIcon, UserIcon, LockClosedIcon, EyeIcon, EyeSlashIcon, ShieldCheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import DatePicker from './DatePicker'
+import { credentialsManager } from '@/utils/credentials'
 
-export default function AllocationForm({ onSubmit }) {
+export default function AllocationForm({ onSubmit, error }) {
   const [formData, setFormData] = useState({
     projectCode: 'FD25DCCM',
     allocStartDate: '01 May 2025',
-    allocEndDate: '31 Jul 2025'
+    allocEndDate: '31 Jul 2025',
+    username: '',
+    password: ''
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
-
+  const [showPassword, setShowPassword] = useState(false)
+  const [hasStoredCredentials, setHasStoredCredentials] = useState(false)
+useEffect(() => {
+  // Always check fresh credentials from storage
+  const storedCredentials = credentialsManager.get()
+  if (storedCredentials) {
+    console.log('✓ Found valid stored credentials for:', storedCredentials.username)
+    setHasStoredCredentials(true)
+    setFormData(prev => ({
+      ...prev,
+      username: storedCredentials.username,
+      password: storedCredentials.password
+    }))
+  } else {
+    console.log('✗ No stored credentials - showing authentication form')
+    setHasStoredCredentials(false)
+    setFormData(prev => ({
+      ...prev,
+      username: '',
+      password: ''
+    }))
+  }
+}, []) // Only run on component mount/remount (key change forces remount)
+// Add a separate effect to handle credential clearing
+useEffect(() => {
+  if (error && error.includes('Authentication failed')) {
+    console.log('Authentication failed - clearing form credentials')
+    setHasStoredCredentials(false)
+    setFormData(prev => ({
+      ...prev,
+      username: '',
+      password: ''
+    }))
+  }
+}, [error])
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({
@@ -29,16 +66,17 @@ export default function AllocationForm({ onSubmit }) {
     }))
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    
-    try {
-      await onSubmit(formData)
-    } finally {
-      setIsSubmitting(false)
-    }
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  setIsSubmitting(true)
+  
+  try {
+    // DON'T store credentials here - let the parent handle success/failure
+    await onSubmit(formData)
+  } finally {
+    setIsSubmitting(false)
   }
+}
 
   const setQuickDate = (field, type) => {
     const now = new Date()
@@ -76,14 +114,122 @@ export default function AllocationForm({ onSubmit }) {
     >
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">Create Allocation Request</h2>
+          <h2 className="card-title">Project Allocation Request</h2>
           <p className="card-subtitle">
-            Enter your project details to fetch comprehensive allocation data
+            Enter your details to fetch comprehensive allocation data
           </p>
         </div>
 
         <div className="card-body">
+          {/* Error Display */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="error-alert"
+            >
+              <div className="error-alert-icon">
+                <ExclamationTriangleIcon className="w-5 h-5" />
+              </div>
+              <div className="error-alert-content">
+                <h4 className="error-alert-title">Request Failed</h4>
+                <p className="error-alert-message">{error}</p>
+              </div>
+            </motion.div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Credentials Section - Only show if not stored */}
+            {!hasStoredCredentials && (
+              <div className="credentials-section">
+                <div className="section-header-auth">
+                  <div className="auth-icon">
+                    <ShieldCheckIcon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="auth-title">Authentication Required</h3>
+                    <p className="auth-subtitle">Secure access to allocation data</p>
+                  </div>
+                </div>
+                
+                <div className="auth-form-grid">
+                  <div className="auth-input-group">
+                    <label className="auth-label">Username</label>
+                    <div className="auth-input-wrapper">
+                      <UserIcon className="auth-input-icon" />
+                      <input
+                        type="text"
+                        name="username"
+                        value={formData.username}
+                        onChange={handleChange}
+                        className="auth-input"
+                        placeholder="Enter your username"
+                        required
+                        autoComplete="username"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="auth-input-group">
+                    <label className="auth-label">Password</label>
+                    <div className="auth-input-wrapper">
+                      <LockClosedIcon className="auth-input-icon" />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        className="auth-input"
+                        placeholder="Enter your password"
+                        required
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="password-toggle-btn"
+                      >
+                        {showPassword ? (
+                          <EyeSlashIcon className="w-5 h-5" />
+                        ) : (
+                          <EyeIcon className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="auth-notice">
+                  <div className="auth-notice-icon">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </div>
+                  <span>Credentials will be securely stored for this session only</span>
+                </div>
+              </div>
+            )}
+
+            {/* Authenticated Status */}
+            {hasStoredCredentials && (
+              <div className="auth-status">
+                <div className="auth-status-content">
+                  <div className="auth-status-icon">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="auth-status-text">
+                    <h4>Authenticated Session Active</h4>
+                    <p>Signed in as <strong>{formData.username}</strong></p>
+                  </div>
+                </div>
+                <div className="auth-status-badge">
+                  <span>Secure</span>
+                </div>
+              </div>
+            )}
+
             {/* Project Information */}
             <div className="form-section">
               <div className="section-header">
@@ -174,58 +320,60 @@ export default function AllocationForm({ onSubmit }) {
               </div>
             </div>
 
-            {/* Summary */}
-            <div className="summary-card">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            {/* Request Summary */}
+            <div className="request-summary">
+              <div className="summary-header">
                 <MagnifyingGlassIcon className="w-5 h-5" />
-                Request Summary
-              </h3>
+                <h3>Request Summary</h3>
+              </div>
               <div className="summary-grid">
                 <div className="summary-item">
-                  <div className="summary-icon">
-                    <FolderIcon className="w-6 h-6" />
-                  </div>
+                  <div className="summary-label">User</div>
+                  <div className="summary-value">{formData.username || 'Not provided'}</div>
+                </div>
+                <div className="summary-item">
                   <div className="summary-label">Project</div>
                   <div className="summary-value">{formData.projectCode || 'Not specified'}</div>
                 </div>
                 <div className="summary-item">
-                  <div className="summary-icon">
-                    <CalendarIcon className="w-6 h-6" />
+                  <div className="summary-label">Date Range</div>
+                  <div className="summary-value">
+                    {formData.allocStartDate && formData.allocEndDate 
+                      ? `${formData.allocStartDate} to ${formData.allocEndDate}`
+                      : 'Not selected'
+                    }
                   </div>
-                  <div className="summary-label">Start Date</div>
-                  <div className="summary-value">{formData.allocStartDate || 'Not selected'}</div>
-                </div>
-                <div className="summary-item">
-                  <div className="summary-icon">
-                    <CalendarIcon className="w-6 h-6" />
-                  </div>
-                  <div className="summary-label">End Date</div>
-                  <div className="summary-value">{formData.allocEndDate || 'Not selected'}</div>
                 </div>
               </div>
             </div>
 
             {/* Submit Button */}
-            <div className="text-center">
+            <div className="submit-section">
               <button
                 type="submit"
-                className="btn btn-primary btn-lg"
-                disabled={!formData.projectCode || !formData.allocStartDate || !formData.allocEndDate || isSubmitting}
+                className="submit-btn"
+                disabled={
+                  !formData.projectCode || 
+                  !formData.allocStartDate || 
+                  !formData.allocEndDate || 
+                  (!hasStoredCredentials && (!formData.username || !formData.password)) ||
+                  isSubmitting
+                }
               >
                 {isSubmitting ? (
                   <>
-                    <div className="loading-spinner" style={{ width: '1rem', height: '1rem', margin: 0 }} />
-                    Processing...
+                    <div className="btn-spinner" />
+                    <span>Processing Request...</span>
                   </>
                 ) : (
                   <>
                     <MagnifyingGlassIcon className="w-5 h-5" />
-                    Execute Allocation Request
+                    <span>Execute Allocation Request</span>
                   </>
                 )}
               </button>
-              <p className="form-help mt-4">
-                This will fetch comprehensive allocation data for your specified project and date range
+              <p className="submit-help">
+                This will fetch comprehensive allocation data for your specified criteria
               </p>
             </div>
           </form>

@@ -1,8 +1,12 @@
 'use client'
 
 import { ArrowRightOnRectangleIcon, UserIcon } from '@heroicons/react/24/outline'
+import { credentialsManager } from '@/utils/credentials'
 
 export default function Header({ user, onLogout }) {
+  // Always get fresh credentials from storage
+  const storedCredentials = credentialsManager.get()
+  
   return (
     <header className="app-header">
       <div className="header-content">
@@ -16,24 +20,22 @@ export default function Header({ user, onLogout }) {
           </div>
         </div>
 
-        {user && (
-          <div className="user-menu">
-            <div className="user-profile">
-              <div className="user-avatar">
-                <UserIcon className="w-4 h-4" />
-              </div>
-              <div className="user-info">
-                <h3>{user.username}</h3>
-                <p>Administrator</p>
-              </div>
+        <div className="user-menu">
+          <div className="user-profile">
+            <div className="user-avatar">
+              <UserIcon className="w-4 h-4" />
             </div>
-            
-            <button onClick={onLogout} className="logout-btn">
-              <ArrowRightOnRectangleIcon className="w-4 h-4" />
-              Sign Out
-            </button>
+            <div className="user-info">
+              <h3>{storedCredentials?.username || 'Guest'}</h3>
+              <p>{storedCredentials ? 'Authenticated User' : 'Not Authenticated'}</p>
+            </div>
           </div>
-        )}
+          
+          <button onClick={onLogout} className="logout-btn">
+            <ArrowRightOnRectangleIcon className="w-4 h-4" />
+            {storedCredentials ? 'Sign Out' : 'Clear Session'}
+          </button>
+        </div>
       </div>
     </header>
   )

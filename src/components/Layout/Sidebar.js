@@ -3,10 +3,10 @@
 import { 
   HomeIcon, 
   CircleStackIcon, 
-  Cog6ToothIcon,
+  CalendarIcon,
   ChartBarIcon,
   UsersIcon,
-  CalendarIcon
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline'
 
 export default function Sidebar({ activeSection = 'dashboard' }) {
@@ -71,9 +71,11 @@ export default function Sidebar({ activeSection = 'dashboard' }) {
                     href={item.href}
                     className={`nav-link ${isActive ? 'active' : ''}`}
                   >
-                    <Icon className="nav-icon" />
+                    <div className="nav-icon-wrapper">
+                      <Icon className="nav-icon" />
+                    </div>
                     <div className="nav-text">
-                      <div>{item.name}</div>
+                      <div className="nav-name">{item.name}</div>
                       <div className="nav-description">{item.description}</div>
                     </div>
                   </a>
@@ -87,13 +89,13 @@ export default function Sidebar({ activeSection = 'dashboard' }) {
           <div className="help-icon">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-           </svg>
-         </div>
-         <h3>Need Help?</h3>
-         <p>Get assistance with project allocations and system features.</p>
-         <button className="help-btn">Contact Support</button>
-       </div>
-     </div>
-   </aside>
- )
+            </svg>
+          </div>
+          <h3>Need Help?</h3>
+          <p>Get assistance with project allocations and system features.</p>
+          <button className="help-btn">Contact Support</button>
+        </div>
+      </div>
+    </aside>
+  )
 }
