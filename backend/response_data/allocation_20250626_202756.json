@@ -1,0 +1,66 @@
+{
+  "status_code": 200,
+  "success": true,
+  "data": [
+    {
+      "ActivityDesc": "OFFSHORE",
+      "ActivityNo": 550,
+      "ActivityRate": 0,
+      "ActivityRateUOM": "",
+      "AllocAccessible": 1,
+      "AllocEndDate": "31 Jul 2025",
+      "AllocNo": 76898892,
+      "AllocStartDate": "01 May 2025",
+      "AllocUpdateAllowed": 1,
+      "CityCode": 15,
+      "Country": "INDIA",
+      "CountryCode": "IN",
+      "EmpMailId": "john.doe01",
+      "EmpName": "John Doe",
+      "EmpNo": "1395195",
+      "Percent": 100.0,
+      "ProjectCode": "FD25DCCM",
+      "RateType": "",
+      "ReportingManagerEmpNo": "139168    ",
+      "ReportingManagerMailId": "manager01@company.com",
+      "StateCity": "PUNE"
+    },
+    {
+      "ActivityDesc": "ONSHORE",
+      "ActivityNo": 551,
+      "ActivityRate": 0,
+      "ActivityRateUOM": "",
+      "AllocAccessible": 1,
+      "AllocEndDate": "30 Jun 2025",
+      "AllocNo": 76898893,
+      "AllocStartDate": "15 May 2025",
+      "AllocUpdateAllowed": 1,
+      "CityCode": 20,
+      "Country": "USA",
+      "CountryCode": "US",
+      "EmpMailId": "jane.smith02",
+      "EmpName": "Jane Smith",
+      "EmpNo": "1395196",
+      "Percent": 80.0,
+      "ProjectCode": "FD25DCCM",
+      "RateType": "",
+      "ReportingManagerEmpNo": "139169    ",
+      "ReportingManagerMailId": "manager02@company.com",
+      "StateCity": "NEW YORK"
+    }
+  ],
+  "error": null,
+  "request_payload": {
+    "projectCode": "FD25DCCM",
+    "allocStartDate": "01 May 2025",
+    "allocEndDate": "31 Jul 2025"
+  },
+  "timestamp": "2025-06-26T20:27:56.034754",
+  "response_headers": {
+    "Server": "Werkzeug/3.1.3 Python/3.13.1",
+    "Date": "Thu, 26 Jun 2025 14:57:56 GMT",
+    "Content-Type": "application/json",
+    "Content-Length": "1231",
+    "Connection": "close"
+  }
+}

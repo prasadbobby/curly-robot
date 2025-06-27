@@ -16,7 +16,7 @@ import { Table } from './ui/Table'
 import { JsonViewer } from './ui/JsonViewer'
 import { ErrorDisplay } from './ui/ErrorDisplay'
 
-export default function ResultsDisplay({ results, onNewRequest }) {
+export default function ResultsDisplay({ results, onNewRequest, onViewComparison }) {
   const downloadData = () => {
     const dataStr = JSON.stringify(results, null, 2)
     const dataBlob = new Blob([dataStr], { type: 'application/json' })
@@ -30,36 +30,38 @@ export default function ResultsDisplay({ results, onNewRequest }) {
     URL.revokeObjectURL(url)
   }
 
-  const renderTable = (data) => {
-    if (!data || (Array.isArray(data) && data.length === 0)) {
-      const hasFilters = results.filter_applied
-      const originalCount = results.original_count || 0
-      
-      return (
-        <div className="empty-state">
-          <TableCellsIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">
-            {hasFilters && originalCount > 0 ? 'No Matching Allocations' : 'No Data Available'}
-          </h3>
-          <p className="text-gray-500">
-            {hasFilters && originalCount > 0 
-              ? `Found ${originalCount} allocations for this project, but none match your date range criteria.`
-              : 'There\'s no data to display in table format'
-            }
-          </p>
-          {hasFilters && originalCount > 0 && (
-            <div className="mt-4">
-              <button 
-                onClick={onNewRequest} 
-                className="btn btn-outline btn-sm"
-              >
-                Try Different Date Range
-              </button>
-            </div>
-          )}
+const renderTable = (data) => {
+  if (!data || (Array.isArray(data) && data.length === 0)) {
+    const hasFilters = results.filter_applied
+    const originalCount = results.original_count || 0
+    
+    return (
+      <div className="empty-state">
+        <div className="empty-state-icon-wrapper">
+          <TableCellsIcon className="empty-state-icon" />
         </div>
-      )
-    }
+        <h3 className="empty-state-title">
+          {hasFilters && originalCount > 0 ? 'No Matching Allocations' : 'No Data Available'}
+        </h3>
+        <p className="empty-state-subtitle">
+          {hasFilters && originalCount > 0 
+            ? `Found ${originalCount} allocations for this project, but none match your date range criteria.`
+            : 'There\'s no data to display in table format'
+          }
+        </p>
+        {hasFilters && originalCount > 0 && (
+          <div className="empty-state-actions">
+            <button 
+              onClick={onNewRequest} 
+              className="btn btn-outline btn-sm"
+            >
+              Try Different Date Range
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
 
     const dataArray = Array.isArray(data) ? data : [data]
     const allKeys = new Set()
@@ -254,34 +256,174 @@ export default function ResultsDisplay({ results, onNewRequest }) {
       transition={{ duration: 0.5 }}
       className="results-container"
     >
-      {/* Results Header */}
-      <div className="results-header">
-        <div className="results-header-content">
-          <div>
-            <h1 className="results-title">Allocation Results</h1>
-            <p className="results-subtitle">
-              {results.filter_applied 
-                ? `Filtered results for ${results.filter_applied.projectCode} from ${results.filter_applied.startDate} to ${results.filter_applied.endDate}`
-                : 'Review your project allocation data and insights'
-              }
-            </p>
-          </div>
-          
-          <div className={`status-badge ${results.success ? 'status-success' : 'status-error'}`}>
-            {results.success ? (
-              <>
-                <CheckCircleIcon className="w-5 h-5" />
-                Success
-              </>
-            ) : (
-              <>
-                <XCircleIcon className="w-5 h-5" />
-                Failed
-              </>
-            )}
+    {/* Results Header */}
+<div className="results-header">
+  <div className="results-header-content">
+    <div>
+      <h1 className="results-title">Allocation Results</h1>
+      <p className="results-subtitle">
+        {results.filter_applied 
+          ? `Filtered results for ${results.filter_applied.projectCode} from ${results.filter_applied.startDate} to ${results.filter_applied.endDate}`
+          : 'Review your project allocation data and insights'
+        }
+      </p>
+      
+      {/* Comparison Indicator */}
+      {results.comparison_available && results.comparison_summary && (
+        <div className="comparison-indicator mt-4">
+          <div className="flex items-center gap-3 text-sm bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 rounded-xl border border-blue-200">
+            <div className="comparison-icon">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div className="comparison-content flex-1">
+              <div className="comparison-title text-blue-800 font-semibold">
+                📊 Comparison Available
+              </div>
+              <div className="comparison-details text-blue-700">
+                <span className="mr-4">
+                  <strong>Net Change:</strong> 
+                  <span className={`ml-1 font-bold ${
+                    results.comparison_summary.net_change > 0 
+                      ? 'text-green-600' 
+                      : results.comparison_summary.net_change < 0 
+                        ? 'text-red-600' 
+                        : 'text-gray-600'
+                  }`}>
+                    {results.comparison_summary.net_change > 0 ? '+' : ''}{results.comparison_summary.net_change} allocations
+                  </span>
+                </span>
+                <span className="mr-4">
+                  <strong>Changes:</strong> 
+                  <span className="ml-1 font-bold text-purple-600">
+                    {results.comparison_summary.changes_detected} detected
+                  </span>
+                </span>
+                <span className="text-xs text-blue-600">
+                  vs. {new Date(results.comparison_summary.previous_timestamp).toLocaleDateString()} request
+                </span>
+              </div>
+            </div>
+            <div className="comparison-action">
+              <button
+                onClick={onViewComparison} // FIXED: Use prop instead of setDashboardView
+                className="btn-mini bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+                View Comparison
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* No Comparison Available Message */}
+      {!results.comparison_available && results.success && (
+        <div className="no-comparison-indicator mt-4">
+          <div className="flex items-center gap-3 text-sm bg-gradient-to-r from-gray-50 to-slate-50 px-4 py-3 rounded-xl border border-gray-200">
+            <div className="no-comparison-icon">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="no-comparison-content">
+              <span className="text-gray-600">
+                🆕 <strong>First Request:</strong> No previous data found for comparison. 
+                Future requests with the same criteria will show change analysis.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+    
+    <div className="results-header-actions">
+      {/* Status Badge */}
+      <div className={`status-badge ${results.success ? 'status-success' : 'status-error'}`}>
+        {results.success ? (
+          <>
+            <CheckCircleIcon className="w-5 h-5" />
+            Success
+          </>
+        ) : (
+          <>
+            <XCircleIcon className="w-5 h-5" />
+            Failed
+          </>
+        )}
       </div>
+
+      {/* Quick Stats */}
+      {results.success && results.filtered_count !== undefined && (
+        <div className="quick-stats">
+          <div className="stat-item">
+            <div className="stat-value">{results.filtered_count}</div>
+            <div className="stat-label">Results</div>
+          </div>
+          {results.original_count !== results.filtered_count && (
+            <div className="stat-item">
+              <div className="stat-value">{results.original_count}</div>
+              <div className="stat-label">Total</div>
+            </div>
+          )}
+          {results.comparison_summary && (
+            <div className="stat-item comparison-stat">
+              <div className={`stat-value ${
+                results.comparison_summary.net_change > 0 
+                  ? 'text-green-600' 
+                  : results.comparison_summary.net_change < 0 
+                    ? 'text-red-600' 
+                    : 'text-gray-600'
+              }`}>
+                {results.comparison_summary.net_change > 0 ? '+' : ''}{results.comparison_summary.net_change}
+              </div>
+              <div className="stat-label">Change</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+
+  {/* Results Summary Bar */}
+  {results.success && (
+    <div className="results-summary-bar">
+      <div className="summary-items">
+        <div className="summary-item">
+          <span className="summary-label">Project:</span>
+          <span className="summary-value">{results.filter_applied?.projectCode || 'N/A'}</span>
+        </div>
+        <div className="summary-item">
+          <span className="summary-label">Period:</span>
+          <span className="summary-value">
+            {results.filter_applied 
+              ? `${results.filter_applied.startDate} → ${results.filter_applied.endDate}`
+              : 'Custom Range'
+            }
+          </span>
+        </div>
+        <div className="summary-item">
+          <span className="summary-label">Retrieved:</span>
+          <span className="summary-value">{new Date().toLocaleString()}</span>
+        </div>
+        {results.comparison_summary && (
+          <div className="summary-item comparison-summary">
+            <span className="summary-label">Comparison:</span>
+            <span className="summary-value">
+              {results.comparison_summary.changes_detected === 0 
+                ? '✓ No changes detected'
+                : `⚡ ${results.comparison_summary.changes_detected} changes found`
+              }
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )}
+</div>
 
       {/* Request Parameters */}
       <div className="request-params">

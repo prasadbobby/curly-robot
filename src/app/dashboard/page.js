@@ -8,6 +8,9 @@ import ErrorNotification from '@/components/ErrorNotification'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { credentialsManager } from '@/utils/credentials'
 import { motion } from 'framer-motion'
+import { comparisonStorage } from '@/utils/comparisonStorage'
+import { comparisonAnalysis } from '@/utils/comparisonAnalysis'
+import ComparisonDisplay from '@/components/ComparisonDisplay'
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false)
@@ -16,24 +19,26 @@ export default function Dashboard() {
   const [errors, setErrors] = useState([])
   const [dashboardView, setDashboardView] = useState('request')
   const [formKey, setFormKey] = useState(0) // Force form re-render
+  const [comparisonData, setComparisonData] = useState(null)
+  const [showComparison, setShowComparison] = useState(false)
 
   // Normalize date string for comparison
   const normalizeDate = (dateStr) => {
     if (!dateStr) return null
-    
+
     try {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-      
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
       const parts = dateStr.trim().split(/\s+/)
       if (parts.length !== 3) return null
-      
+
       const day = parts[0].padStart(2, '0')
       const month = parts[1]
       const year = parts[2]
-      
+
       if (!months.includes(month)) return null
-      
+
       return `${day} ${month} ${year}`
     } catch (error) {
       console.error('Error normalizing date:', dateStr, error)
@@ -44,25 +49,25 @@ export default function Dashboard() {
   const matchesAllCriteria = (allocation, searchCriteria) => {
     const allocProjectCode = (allocation.ProjectCode || '').trim().toUpperCase()
     const searchProjectCode = (searchCriteria.projectCode || '').trim().toUpperCase()
-    
+
     if (allocProjectCode !== searchProjectCode) {
       return false
     }
-    
+
     const allocStartDate = normalizeDate(allocation.AllocStartDate)
     const searchStartDate = normalizeDate(searchCriteria.allocStartDate)
-    
+
     if (!allocStartDate || !searchStartDate || allocStartDate !== searchStartDate) {
       return false
     }
-    
+
     const allocEndDate = normalizeDate(allocation.AllocEndDate)
     const searchEndDate = normalizeDate(searchCriteria.allocEndDate)
-    
+
     if (!allocEndDate || !searchEndDate || allocEndDate !== searchEndDate) {
       return false
     }
-    
+
     return true
   }
 
@@ -70,14 +75,17 @@ export default function Dashboard() {
     if (!allocations || !Array.isArray(allocations)) {
       return []
     }
-    
+
     return allocations.filter(allocation => matchesAllCriteria(allocation, searchCriteria))
   }
 
+
+  // Update the handleFormSubmit function to include comparison logic
   const handleFormSubmit = async (formData) => {
     setIsLoading(true)
     setError(null)
     setResults(null)
+    setComparisonData(null) // Reset comparison
 
     console.log('Form submitted with data:', formData)
 
@@ -91,7 +99,7 @@ export default function Dashboard() {
       })
 
       const data = await response.json()
-      
+
       console.log('API Response:', {
         httpStatus: response.status,
         responseOk: response.ok,
@@ -99,33 +107,31 @@ export default function Dashboard() {
         dataSuccess: data.success,
         hasError: !!data.error
       })
-      
-      // Check both HTTP status and response data for authentication failures
-      const isUnauthorized = response.status === 401 || 
-                           data.status_code === 401 || 
-                           (data.error && data.error.includes('Unauthorized'))
-      
+
+      const isUnauthorized = response.status === 401 ||
+        data.status_code === 401 ||
+        (data.error && data.error.includes('Unauthorized'))
+
       if (response.ok && data.success && !isUnauthorized) {
         console.log('✓ Authentication successful - storing credentials')
-        
-        // Store credentials only on successful authentication
+
         if (formData.username && formData.password) {
           credentialsManager.store({
             username: formData.username,
             password: formData.password
           })
         }
-        
+
         // Apply filtering logic
         let processedData = { ...data }
-        
+
         if (data.data && Array.isArray(data.data)) {
           const filteredData = filterAllocationsByExactMatch(data.data, {
             projectCode: formData.projectCode,
             allocStartDate: formData.allocStartDate,
             allocEndDate: formData.allocEndDate
           })
-          
+
           processedData = {
             ...data,
             data: filteredData,
@@ -142,46 +148,71 @@ export default function Dashboard() {
               allocStartDate: formData.allocStartDate,
               allocEndDate: formData.allocEndDate
             },
-            message: filteredData.length > 0 
+            message: filteredData.length > 0
               ? `Found ${filteredData.length} exact match(es) for project ${formData.projectCode} with dates ${formData.allocStartDate} to ${formData.allocEndDate}`
               : `No exact matches found for project ${formData.projectCode} with dates ${formData.allocStartDate} to ${formData.allocEndDate}. Try different criteria.`
           }
         }
-        
+
+        // *** NEW COMPARISON LOGIC ***
+        // Find previous data for comparison
+        const previousComparison = comparisonStorage.findPrevious(formData)
+
+        if (previousComparison && previousComparison.results.success) {
+          console.log('Found previous data for comparison')
+
+          // Perform comparison analysis
+          const comparison = comparisonAnalysis.compare(
+            processedData.data,
+            previousComparison.results.data,
+            formData
+          )
+
+          setComparisonData(comparison)
+          setShowComparison(true)
+
+          // Add comparison summary to processed data
+          processedData.comparison_available = true
+          processedData.comparison_summary = {
+            net_change: comparison.summary.netChange,
+            changes_detected: comparison.summary.added + comparison.summary.removed + comparison.summary.modified,
+            previous_timestamp: previousComparison.timestamp
+          }
+        }
+
+        // Store current results for future comparisons
+        comparisonStorage.store(formData, processedData)
+
         setResults(processedData)
         setDashboardView('results')
         credentialsManager.extend()
-        
+
       } else if (isUnauthorized) {
         console.log('✗ Authentication failed - clearing session and forcing credential re-entry')
-        
-        // Clear all stored credentials immediately
+
         credentialsManager.clear()
-        
-        // Force form to completely re-render with empty credentials
         setFormKey(prev => prev + 1)
-        
+
         const errorMsg = 'Authentication failed. Please check your username and password.'
         setError(errorMsg)
         setErrors([errorMsg])
         setDashboardView('request')
-        
+
       } else {
         console.log('✗ Request failed with other error')
-        
+
         const errorMsg = data.error || 'An error occurred while processing your request.'
         setError(errorMsg)
         setErrors([errorMsg])
         setDashboardView('request')
       }
-      
+
     } catch (err) {
       console.error('✗ Network Error:', err)
-      
-      // Clear credentials on network errors
+
       credentialsManager.clear()
       setFormKey(prev => prev + 1)
-      
+
       const errorMsg = 'Network error: Unable to connect to the server. Please check your connection and try again.'
       setError(errorMsg)
       setErrors([errorMsg])
@@ -189,6 +220,20 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false)
     }
+  }
+  // Add comparison download handler
+  const handleDownloadComparison = (comparison) => {
+    const report = comparisonAnalysis.generateReport(comparison)
+    const dataStr = JSON.stringify(report, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `allocation_comparison_${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   const handleNewRequest = () => {
@@ -217,8 +262,8 @@ export default function Dashboard() {
 
   return (
     <>
-      <Layout 
-        user={{ username: storedCredentials?.username || 'Guest' }} 
+      <Layout
+        user={{ username: storedCredentials?.username || 'Guest' }}
         onLogout={handleLogout}
       >
         <div className="dashboard-content">
@@ -283,7 +328,7 @@ export default function Dashboard() {
                   <div className="tab-subtitle">Create allocation request</div>
                 </div>
               </button>
-              
+
               {results && (
                 <button
                   onClick={() => setDashboardView('results')}
@@ -300,9 +345,42 @@ export default function Dashboard() {
                   </div>
                 </button>
               )}
+
+              {/* NEW COMPARISON TAB */}
+              {comparisonData && showComparison && (
+                <button
+                  onClick={() => setDashboardView('comparison')}
+                  className={`nav-tab ${dashboardView === 'comparison' ? 'active' : ''}`}
+                >
+                  <div className="tab-icon">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <div className="tab-content">
+                    <div className="tab-title">Compare Changes</div>
+                    <div className="tab-subtitle">
+                      {comparisonData.summary.netChange > 0 ? '+' : ''}{comparisonData.summary.netChange} allocations
+                    </div>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
 
+          {comparisonData && dashboardView === 'comparison' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="dashboard-comparison-container"
+            >
+              <ComparisonDisplay
+                comparison={comparisonData}
+                onDownload={handleDownloadComparison}
+              />
+            </motion.div>
+          )}
           {/* Main Content */}
           {dashboardView === 'request' && !isLoading && (
             <motion.div
@@ -311,10 +389,10 @@ export default function Dashboard() {
               transition={{ duration: 0.5 }}
               className="dashboard-form-container"
             >
-              <AllocationForm 
+              <AllocationForm
                 key={formKey} // Force complete re-render on auth failure
-                onSubmit={handleFormSubmit} 
-                error={error} 
+                onSubmit={handleFormSubmit}
+                error={error}
               />
             </motion.div>
           )}
@@ -334,24 +412,25 @@ export default function Dashboard() {
           )}
 
           {results && dashboardView === 'results' && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="dashboard-results-container"
-            >
-              <ResultsDisplay 
-                results={results} 
-                onNewRequest={handleNewRequest}
-              />
-            </motion.div>
-          )}
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+    className="dashboard-results-container"
+  >
+    <ResultsDisplay 
+      results={results} 
+      onNewRequest={handleNewRequest}
+      onViewComparison={() => setDashboardView('comparison')} // Add this prop
+    />
+  </motion.div>
+)}
         </div>
       </Layout>
 
       {/* Error Notification */}
-      <ErrorNotification 
-        errors={errors} 
+      <ErrorNotification
+        errors={errors}
         onDismiss={handleDismissErrors}
       />
     </>
